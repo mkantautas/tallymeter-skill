@@ -13,14 +13,14 @@ Every call needs a personal access token as `Authorization: Bearer $TALLYMETER_A
 
 ## Two ways to call — prefer MCP
 
-**MCP (preferred, full capability):** if the `tallymeter` MCP server is connected, use its tools directly: `timer-status`, `start-timer`, `stop-timer`, `list-projects`, `log-time`, `update-entry`, `unbilled-summary`, `board-remaining`, `list-tickets`, `create-ticket`, `update-ticket`, `move-ticket`, `comment-ticket`, `send-feedback`. If it isn't connected, the user can add it:
+**MCP (preferred, full capability):** if the `tallymeter` MCP server is connected, use its tools directly: `timer-status`, `start-timer`, `stop-timer`, `list-projects`, `log-time`, `update-entry`, `unbilled-summary`, `board-remaining`, `list-tickets`, `get-ticket`, `create-ticket`, `update-ticket`, `move-ticket`, `comment-ticket`, `send-feedback`. If it isn't connected, the user can add it:
 
 ```bash
 claude mcp add --transport http tallymeter https://tallymeter.com/mcp \
   --header "Authorization: Bearer $TALLYMETER_API_TOKEN"
 ```
 
-**REST (no MCP needed):** base URL `https://tallymeter.com/api/v1`. Endpoints: `GET /timer`, `POST /timer/start`, `POST /timer/stop`, `GET /projects`, `PATCH /entries/{id}`, `GET /tickets/{key}/summary`, `GET /board/remaining`, `GET /me`, `POST /feedback`. Note: logging *completed* entries and unbilled summaries are MCP-only — over plain REST you can track live via the timer but not backfill finished work.
+**REST (no MCP needed):** base URL `https://tallymeter.com/api/v1`. Endpoints: `GET /timer`, `POST /timer/start`, `POST /timer/stop`, `GET /projects`, `PATCH /entries/{id}`, `GET /tickets/{key}/summary`, `GET /board/remaining`, `GET /board/tickets`, `GET /board/tickets/{key}`, `GET /me`, `POST /feedback`. Note: logging *completed* entries and unbilled summaries are MCP-only — over plain REST you can track live via the timer but not backfill finished work.
 
 ```bash
 # Start (stops any running timer first)
@@ -44,6 +44,7 @@ curl -X POST -H "Authorization: Bearer $TALLYMETER_API_TOKEN" https://tallymeter
 
 - **"How many tickets and hours are left?"** → `board-remaining`. It reports estimate minus logged, clamped to zero per ticket so one overrun cannot cancel out another ticket's real remaining work, with done and backlog columns excluded. Tickets with no estimate appear in `unestimated_tickets` and contribute no hours — say so, rather than letting the total imply they are free. `since_last_snapshot` gives the movement since the last nightly snapshot ("up 16h and 10 tickets since Monday").
 - **Before you rank or amend anything**, call `list-tickets` for that column. Its rank order is the thing you are about to change, and a column you have not read is a column you will reorder by accident.
+- **Reading a ticket:** `get-ticket` (REST `GET /board/tickets/{key}`) returns the markdown description, comments, labels, parent, children, links, attachments and estimate against logged time. Read it before working on or amending a ticket; `list-tickets` returns no description.
 - **Filing a ticket:** `create-ticket` with a title in the board's own voice, a markdown body, the column and an estimate in minutes. It is assigned to the token's user and returns the new key.
 - **Amending someone else's ticket:** `update-ticket` with `append_description`, which adds to the body instead of replacing it. Pass only the fields you mean to change — anything omitted is left alone.
 - **Ranking:** `move-ticket` with `above`, naming the ticket the card should sit on top of, which is how a column is actually ordered. Check the `column_order` it reads back: a rank that silently no-ops is the classic failure here.
