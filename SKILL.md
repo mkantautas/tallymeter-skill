@@ -50,6 +50,7 @@ curl -X POST -H "Authorization: Bearer $TALLYMETER_API_TOKEN" https://tallymeter
 - **Ranking:** `move-ticket` with `above`, naming the ticket the card should sit on top of, which is how a column is actually ordered. Check the `column_order` it reads back: a rank that silently no-ops is the classic failure here.
 - **Recording a decision or a finding:** `comment-ticket`, not an edit to somebody else's description. Whoever filed the ticket, is assigned it or has commented on it gets an email with the comment, so post one considered comment rather than several small ones.
 - **Mentioning someone:** write `@Full Name` (or just the first name when no one else in the workspace shares it) in a comment or description. That person gets an email, and every later comment on the ticket. Mention only when you need that person; a mention is a notification, not a formality.
+- **Layout:** one newline is a line break and a blank line starts a paragraph. A ticket reads best as a short numbered list, a bold label and a line or two per item; long paragraphs don't get read.
 - **Checklists:** a markdown task list in the description (`- [ ] Write the migration`, `- [x] Done item`). The card shows `2/5`, and people tick items on the board. To tick one, rewrite that line through `update-ticket`; leave the rest of the body as it is.
 - **Attach time to its ticket:** pass `ticket_id` when starting a timer. Time logged without one still bills, but it never counts toward that ticket's remaining work.
 
