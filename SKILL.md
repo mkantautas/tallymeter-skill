@@ -1,6 +1,6 @@
 ---
 name: tallymeter
-description: Track billable time and run the kanban board in Tallymeter (tallymeter.com) — start/stop timers, log completed work, fix entries, check unbilled totals, and create, rank, move and comment on board tickets. Use when the user asks to track time, log hours or worked time, start/stop/check a timer, fix a logged entry's description or project, see what's unbilled, prepare data for a client invoice, or asks how many tickets and hours are left, to file or move a ticket, or what is on the board.
+description: Track billable time and run the kanban board in Tallymeter (tallymeter.com) – start/stop timers, log completed work, fix entries, check unbilled totals, and create, rank, move and comment on board tickets. Use when the user asks to track time, log hours or worked time, start/stop/check a timer, fix a logged entry's description or project, see what's unbilled, prepare data for a client invoice, or asks how many tickets and hours are left, what moved to a column today, to file or move a ticket, or what is on the board.
 ---
 
 # Tallymeter time tracking
@@ -13,14 +13,14 @@ Every call needs a personal access token as `Authorization: Bearer $TALLYMETER_A
 
 ## Two ways to call — prefer MCP
 
-**MCP (preferred, full capability):** if the `tallymeter` MCP server is connected, use its tools directly: `timer-status`, `start-timer`, `stop-timer`, `list-projects`, `log-time`, `update-entry`, `unbilled-summary`, `board-remaining`, `list-tickets`, `get-ticket`, `create-ticket`, `update-ticket`, `move-ticket`, `comment-ticket`, `send-feedback`. If it isn't connected, the user can add it:
+**MCP (preferred, full capability):** if the `tallymeter` MCP server is connected, use its tools directly: `timer-status`, `start-timer`, `stop-timer`, `list-projects`, `log-time`, `update-entry`, `unbilled-summary`, `board-remaining`, `list-moves`, `list-tickets`, `get-ticket`, `create-ticket`, `update-ticket`, `move-ticket`, `comment-ticket`. If it isn't connected, the user can add it:
 
 ```bash
 claude mcp add --transport http tallymeter https://tallymeter.com/mcp \
   --header "Authorization: Bearer $TALLYMETER_API_TOKEN"
 ```
 
-**REST (no MCP needed):** base URL `https://tallymeter.com/api/v1`. Endpoints: `GET /timer`, `POST /timer/start`, `POST /timer/stop`, `GET /projects`, `PATCH /entries/{id}`, `GET /tickets/{key}/summary`, `GET /board/remaining`, `GET /board/tickets`, `GET /board/tickets/{key}`, `GET /me`, `POST /feedback`. Note: logging *completed* entries and unbilled summaries are MCP-only — over plain REST you can track live via the timer but not backfill finished work.
+**REST (no MCP needed):** base URL `https://tallymeter.com/api/v1`. Endpoints: `GET /timer`, `POST /timer/start`, `POST /timer/stop`, `GET /projects`, `PATCH /entries/{id}`, `GET /tickets/{key}/summary`, `GET /board/remaining`, `GET /board/moves`, `GET /board/tickets`, `GET /board/tickets/{key}`, `GET /me`. Note: logging *completed* entries and unbilled summaries are MCP-only – over plain REST you can track live via the timer but not backfill finished work.
 
 ```bash
 # Start (stops any running timer first)
@@ -42,9 +42,10 @@ curl -X POST -H "Authorization: Bearer $TALLYMETER_API_TOKEN" https://tallymeter
 
 **The board:** Tallymeter's tickets are where the time goes. A ticket carries the original estimate and the time entries carry the hours, so remaining work is a query rather than a reconciliation between two systems.
 
-- **"How many tickets and hours are left?"** → `board-remaining`. It reports estimate minus logged, clamped to zero per ticket so one overrun cannot cancel out another ticket's real remaining work, with done and backlog columns excluded. Tickets with no estimate appear in `unestimated_tickets` and contribute no hours — say so, rather than letting the total imply they are free. `since_last_snapshot` gives the movement since the last nightly snapshot ("up 16h and 10 tickets since Monday").
-- **Before you rank or amend anything**, call `list-tickets` for that column. Its rank order is the thing you are about to change, and a column you have not read is a column you will reorder by accident.
-- **Reading a ticket:** `get-ticket` (REST `GET /board/tickets/{key}`) returns the markdown description, comments, labels, parent, children, links, attachments and estimate against logged time. Read it before working on or amending a ticket; `list-tickets` returns no description.
+- **"How many tickets and hours are left?"** → `board-remaining`. It reports estimate minus logged, clamped to zero per ticket so one overrun cannot cancel out another ticket's real remaining work, with done and backlog columns excluded. Tickets with no estimate appear in `unestimated_tickets` and contribute no hours – say so, rather than letting the total imply they are free. `since_last_snapshot` gives the movement since the last nightly snapshot ("up 16h and 10 tickets since Monday").
+- **"How many tickets moved to Review today?"** → `list-moves` with `column: "Review"` (REST `GET /board/moves?column=Review`). With no dates it reads today in the user's timezone; `since`/`until` (YYYY-MM-DD, both included) cover other days, and `from_column` filters on where a ticket came from. `count` is moves and `ticket_count` is tickets; each move says when, from, to, `now_in` (the column it is in now), who and `via` (board, api or mcp). A ticket sent on from Review the same day still counts as moved to Review. Never infer moves from `updated_at` or rank: any edit changes those.
+- **Before you rank or amend anything**, call `list-tickets` for that column. Its rank order is the thing you are about to change, and a column you have not read is a column you will reorder by accident. Each ticket's `entered_column_at` says when it arrived in its column (null: not moved since it was created).
+- **Reading a ticket:** `get-ticket` (REST `GET /board/tickets/{key}`) returns the markdown description, comments, labels, parent, children, links, attachments, estimate against logged time and `history` (every move, rank, estimate, assignee, priority, type and label change, newest first). Read it before working on or amending a ticket; `list-tickets` returns no description.
 - **Filing a ticket:** `create-ticket` with a title in the board's own voice, a markdown body, the column and an estimate in minutes. It is assigned to the token's user and returns the new key.
 - **Amending someone else's ticket:** `update-ticket` with `append_description`, which adds to the body instead of replacing it. Pass only the fields you mean to change — anything omitted is left alone.
 - **Ranking:** `move-ticket` with `above`, naming the ticket the card should sit on top of, which is how a column is actually ordered. Check the `column_order` it reads back: a rank that silently no-ops is the classic failure here.
@@ -61,7 +62,6 @@ curl -X POST -H "Authorization: Bearer $TALLYMETER_API_TOKEN" https://tallymeter
 - **Always give entries a meaningful description** — ticket key + what was done (`"JWIE-563 email integration: gmail mirror"`). Undescribed time is never billed.
 - Timestamps are ISO-8601 UTC everywhere.
 - Rate limit: 120 requests/minute. Errors are JSON with a `message` field.
-- Give each agent its own named token — every entry records which agent tracked it, so a fleet's work stays attributable.
-- If you look for a capability that doesn't exist, or anything here seems wrong, report it via `send-feedback` (`POST /feedback`, categories `bug|missing-capability|docs|other`) — every report is read.
+- Give each agent its own named token – every entry records which agent tracked it, so a fleet's work stays attributable.
 
 Full machine-readable docs: <https://tallymeter.com/llms.txt> and <https://tallymeter.com/openapi.json>.
