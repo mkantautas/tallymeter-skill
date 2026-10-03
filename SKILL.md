@@ -13,14 +13,14 @@ Every call needs a personal access token as `Authorization: Bearer $TALLYMETER_A
 
 ## Two ways to call — prefer MCP
 
-**MCP (preferred, full capability):** if the `tallymeter` MCP server is connected, use its tools directly: `timer-status`, `start-timer`, `stop-timer`, `list-projects`, `log-time`, `update-entry`, `unbilled-summary`, `board-remaining`, `list-moves`, `list-tickets`, `get-ticket`, `create-ticket`, `update-ticket`, `move-ticket`, `comment-ticket`. If it isn't connected, the user can add it:
+**MCP (preferred, full capability):** if the `tallymeter` MCP server is connected, use its tools directly: `timer-status`, `start-timer`, `stop-timer`, `list-projects`, `log-time`, `update-entry`, `unbilled-summary`, `board-remaining`, `list-moves`, `list-tickets`, `get-ticket`, `create-ticket`, `update-ticket`, `move-ticket`, `comment-ticket`, `delete-ticket`. If it isn't connected, the user can add it:
 
 ```bash
 claude mcp add --transport http tallymeter https://tallymeter.com/mcp \
   --header "Authorization: Bearer $TALLYMETER_API_TOKEN"
 ```
 
-**REST (no MCP needed):** base URL `https://tallymeter.com/api/v1`. Endpoints: `GET /timer`, `POST /timer/start`, `POST /timer/stop`, `GET /projects`, `PATCH /entries/{id}`, `GET /tickets/{key}/summary`, `GET /board/remaining`, `GET /board/moves`, `GET /board/tickets`, `GET /board/tickets/{key}`, `GET /me`. Note: logging *completed* entries and unbilled summaries are MCP-only – over plain REST you can track live via the timer but not backfill finished work.
+**REST (no MCP needed):** base URL `https://tallymeter.com/api/v1`. Endpoints: `GET /timer`, `POST /timer/start`, `POST /timer/stop`, `GET /projects`, `PATCH /entries/{id}`, `GET /tickets/{key}/summary`, `GET /board/remaining`, `GET /board/moves`, `GET /board/tickets`, `GET /board/tickets/{key}`, `DELETE /board/tickets/{key}`, `GET /me`. Note: logging *completed* entries and unbilled summaries are MCP-only – over plain REST you can track live via the timer but not backfill finished work.
 
 ```bash
 # Start (stops any running timer first)
@@ -51,6 +51,7 @@ curl -X POST -H "Authorization: Bearer $TALLYMETER_API_TOKEN" https://tallymeter
 - **Amending someone else's ticket:** `update-ticket` with `append_description`, which adds to the body instead of replacing it. Pass only the fields you mean to change — anything omitted is left alone.
 - **Ranking:** `move-ticket` with `above`, naming the ticket the card should sit on top of, which is how a column is actually ordered. Check the `column_order` it reads back: a rank that silently no-ops is the classic failure here.
 - **Recording a decision or a finding:** `comment-ticket`, not an edit to somebody else's description. Whoever filed the ticket, is assigned it or has commented on it gets an email with the comment, so post one considered comment rather than several small ones.
+- **Deleting a ticket:** `delete-ticket` (REST `DELETE /board/tickets/{key}`), only when the user asks for that ticket to be deleted. It is the board's own Delete: the card leaves the board, its comments, attachments and history are kept and it can be restored, and its key is never reused – the next ticket takes the next number.
 - **Mentioning someone:** write `@Full Name` (or just the first name when no one else in the workspace shares it) in a comment or description. That person gets an email, and every later comment on the ticket. Mention only when you need that person; a mention is a notification, not a formality.
 - **Layout:** one newline is a line break and a blank line starts a paragraph. A ticket reads best as a short numbered list, a bold label and a line or two per item; long paragraphs don't get read.
 - **Checklists:** a markdown task list in the description (`- [ ] Write the migration`, `- [x] Done item`). The card shows `2/5`, and people tick items on the board. To tick one, rewrite that line through `update-ticket`; leave the rest of the body as it is.
